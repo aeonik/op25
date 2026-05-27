@@ -1925,8 +1925,12 @@ function appendCallHistory(sysid, tg1, tg2, tag1, tag2, freq, sourceId1, sourceI
   var epochMs = now.getTime();
 
   // Normalize sysid -> 3-digit hex
-  var sysHex = Number(sysid).toString(16).toUpperCase().padStart(3, "0");
+  var sysNum = Number(sysid);
 
+  var sysHex = (!isNaN(sysNum) && sysid !== null && sysid !== "")
+    ? sysNum.toString(16).toUpperCase().padStart(3, "0")
+    : "-";
+    
   // helpers
   function cleanStr(v) {
     if (v === undefined || v === null) return "";
