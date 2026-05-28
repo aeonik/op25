@@ -96,6 +96,7 @@ var TG_TAG_CACHE = {}; // { "1A2": { "1234": "PD Dispatch", ... }, ... }
 
 // stores the time a tg was last seen so duplicates are avoided in the call history table
 var callHistorySeen = new Map(); // key -> lastSeenMs
+var callLogSeen = new Map();     // key -> lastSeenMs, for Voice Grant (Python) dedup
 
 // stores sort params for the seen talkgroup table popup
 var SEEN_TG_SORT = { col: null, asc: true };
@@ -1562,6 +1563,13 @@ function call_log(d) {
 				
 			if (rid == 0)
 				return;  // srcaddr not yet known; a follow-up log entry with the real ID will arrive
+
+			const logKey = sysid + "|" + tgid + "|" + rid;
+			const nowMs = Date.now();
+			const ttlMs = (Number(MAX_HISTORY_SECONDS) || 5) * 1000;
+			if (callLogSeen.has(logKey) && (nowMs - callLogSeen.get(logKey)) <= ttlMs)
+				return;
+			callLogSeen.set(logKey, nowMs);
 
 			displayRtag = (rtag !== "") ? rtag : "ID: " + rid;
 			displayTtag = (tgtag !== "") ? tgtag : "Talkgroup " + tgid;
