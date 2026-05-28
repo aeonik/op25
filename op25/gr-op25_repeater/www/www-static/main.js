@@ -1561,8 +1561,8 @@ function call_log(d) {
 			  var slot = log.slot;
 				
 			if (rid == 0)
-				rid = "-";
-			
+				return;  // srcaddr not yet known; a follow-up log entry with the real ID will arrive
+
 			displayRtag = (rtag !== "") ? rtag : "ID: " + rid;
 			displayTtag = (tgtag !== "") ? tgtag : "Talkgroup " + tgid;
 			
