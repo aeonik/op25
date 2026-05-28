@@ -1375,15 +1375,14 @@ if (hasValue(tg2)) {
 				? srctag1
 				: (src1 != null && String(src1).trim() !== "" && Number(src1) !== 0)
 					? `ID: ${src1}`
-					: "-";
-			
+					: null;
+
 			let source2 =
 			  (srctag2 != null && String(srctag2).trim() !== "")
 				? srctag2
 				: (src2 != null && String(src2).trim() !== "" && Number(src2) !== 0)
 					? `ID: ${src2}`
-					: `ID: ${src1}` 	// there may be a bug python side that causes the ID for srctag[1] to show up in [0] when
-								    	// a tgtag is not present python side.
+					: null;
 			
 			
 			
@@ -2043,9 +2042,8 @@ function processLeg(tg, tag, src, method) {
   markSeen(tgStr, srcStr);
 }
 
-  // Process both legs (even if equal — you can decide whether to suppress same TG)
   processLeg(tg1, tag1, sourceId1, "tg1");
-  processLeg(tg2, tag2, sourceId2, "tg2");
+  if (String(tg2) !== String(tg1)) processLeg(tg2, tag2, sourceId2, "tg2");
 
 
   applySmartColorsToCallHistory();
