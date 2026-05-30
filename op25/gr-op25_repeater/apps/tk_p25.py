@@ -404,6 +404,7 @@ class p25_system(object):
         self.rfss_lra = None             # Location Registration Area (RFSS/NET_STS octet 2)
         self.sys_service_class = None    # SYS_SRV_BCST 'services available' (24-bit field)
         self.utc_offset_min = None       # TIME_DATE_ANN local time offset (signed minutes)
+        self.encryption_algid = None     # P_PARM_BCST algid: set => encrypted control channel
         self.ns_syid = int(ast.literal_eval(from_dict(config, "sysid", "0")))
         self.ns_wacn = int(ast.literal_eval(from_dict(config, "wacn", "0")))
         self.ns_chan = 0
@@ -764,6 +765,11 @@ class p25_system(object):
                 add_unique_freq(self.cc_list, f1)
             if self.debug >= 10:
                 sys.stderr.write('%s [%d] mbt(0x3a) rfss_sts_bcst: sys: %x rfid: %x stid: %x ch1: %s ch2: %s\n' %(log_ts.get(), m_rxid, syid, rfid, stid, self.channel_id_to_string(ch1), self.channel_id_to_string(ch2)))
+        elif opcode == 0x3e:  # protection parameter broadcast -> encrypted control channel
+            algid = (header >> 16) & 0xff   # header octet 9; header arg is raw_header << 16
+            self.encryption_algid = algid
+            if self.debug >= 10:
+                sys.stderr.write('%s [%d] mbt(0x3e) p_parm_bcst: algid: %x\n' %(log_ts.get(), m_rxid, algid))
         else:
             if self.debug >= 10:
                 sys.stderr.write('%s [%d] mbt(0x%02x) unhandled: %x\n' %(log_ts.get(), m_rxid, opcode, mbt_data))
@@ -1914,6 +1920,7 @@ class p25_system(object):
         d['wacn']           = self.ns_wacn
         d['network_active'] = self.rfss_network_active  # 0 == site running failsoft (RFSS_STS_BCST 'A' bit)
         d['lra']            = self.rfss_lra
+        d['encryption_algid'] = self.encryption_algid  # not None => encrypted control channel (P_PARM_BCST)
         d['secondary']      = list(self.secondary.keys())
         d['frequencies']    = {}
         d['frequency_data'] = {}
