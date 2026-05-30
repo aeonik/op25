@@ -400,6 +400,7 @@ class p25_system(object):
         self.rfss_stid = 0
         self.rfss_chan = 0
         self.rfss_txchan = 0
+        self.rfss_network_active = None  # RFSS_STS_BCST 'A' bit: 1 = active RFSS link, 0 = failsoft
         self.ns_syid = int(ast.literal_eval(from_dict(config, "sysid", "0")))
         self.ns_wacn = int(ast.literal_eval(from_dict(config, "wacn", "0")))
         self.ns_chan = 0
@@ -1021,6 +1022,7 @@ class p25_system(object):
             rfid = (tsbk >> 48) & 0xff
             stid = (tsbk >> 40) & 0xff
             chan = (tsbk >> 24) & 0xffff
+            net  = (tsbk >> 68) & 0x1   # 'A' bit (octet 3): 1 = active RFSS network connection
             f1 = self.channel_id_to_frequency(chan)
             if f1:
                 self.rfss_syid = syid
@@ -1028,9 +1030,10 @@ class p25_system(object):
                 self.rfss_stid = stid
                 self.rfss_chan = f1
                 self.rfss_txchan = f1 + self.freq_table[chan >> 12]['offset']
+                self.rfss_network_active = net
                 add_unique_freq(self.cc_list, f1)
             if self.debug >= 10:
-                sys.stderr.write('%s [%d] tsbk(0x3a) rfss_sts_bcst: syid: %x rfid: %x stid: %d ch1: %x(%s)\n' %(log_ts.get(), m_rxid, syid, rfid, stid, chan, self.channel_id_to_string(chan)))
+                sys.stderr.write('%s [%d] tsbk(0x3a) rfss_sts_bcst: syid: %x rfid: %x stid: %d A: %d ch1: %x(%s)\n' %(log_ts.get(), m_rxid, syid, rfid, stid, net, chan, self.channel_id_to_string(chan)))
         elif opcode == 0x39:   # secondary cc
             mfrid = (tsbk >> 80) & 0xff
             rfid  = (tsbk >> 72) & 0xff
@@ -1064,13 +1067,15 @@ class p25_system(object):
             rfid = (tsbk >> 48) & 0xff
             stid = (tsbk >> 40) & 0xff
             ch1  = (tsbk >> 24) & 0xffff
+            cfva = (tsbk >> 68) & 0xf   # octet-3 signaling: C(onventional) F(ailure) V(alid) A(ctive net)
             table = (ch1 >> 12) & 0xf
             f1 = self.channel_id_to_frequency(ch1)
             if f1 and table in self.freq_table:
                 self.adjacent[f1] = 'rfid: %d stid:%d uplink:%f tbl:%d' % (rfid, stid, (f1 + self.freq_table[table]['offset']) / 1000000.0, table)
-                self.adjacent_data[f1] = {'rfid': rfid, 'stid':stid, 'uplink': f1 + self.freq_table[table]['offset'], 'table': table}
+                self.adjacent_data[f1] = {'rfid': rfid, 'stid':stid, 'uplink': f1 + self.freq_table[table]['offset'], 'table': table,
+                                          'conventional': (cfva >> 3) & 1, 'failure': (cfva >> 2) & 1, 'valid': (cfva >> 1) & 1, 'active': cfva & 1}
             if self.debug >= 10:
-                sys.stderr.write('%s [%d] tsbk(0x3c) adj_sts_bcst: rfid: %x stid: %d ch1: %x(%s)\n' %(log_ts.get(), m_rxid, rfid, stid, ch1, self.channel_id_to_string(ch1)))
+                sys.stderr.write('%s [%d] tsbk(0x3c) adj_sts_bcst: rfid: %x stid: %d C: %d F: %d V: %d A: %d ch1: %x(%s)\n' %(log_ts.get(), m_rxid, rfid, stid, (cfva >> 3) & 1, (cfva >> 2) & 1, (cfva >> 1) & 1, cfva & 1, ch1, self.channel_id_to_string(ch1)))
                 if table in self.freq_table:
                     sys.stderr.write('%s [%d] tsbk(0x3c) adj_sts_bcst: base freq: %s step: %s\n' % (log_ts.get(), m_rxid, self.freq_table[table]['frequency'] , self.freq_table[table]['step'] ))
         else:
@@ -1885,6 +1890,7 @@ class p25_system(object):
         d['rxchan']         = self.rfss_chan
         d['txchan']         = self.rfss_txchan
         d['wacn']           = self.ns_wacn
+        d['network_active'] = self.rfss_network_active  # 0 == site running failsoft (RFSS_STS_BCST 'A' bit)
         d['secondary']      = list(self.secondary.keys())
         d['frequencies']    = {}
         d['frequency_data'] = {}
