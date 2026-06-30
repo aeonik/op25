@@ -1924,6 +1924,7 @@ class p25_system(object):
         d['secondary']      = list(self.secondary.keys())
         d['frequencies']    = {}
         d['frequency_data'] = {}
+        d['talkgroup_data'] = {}
         d['patch_data']     = {}
         d['wuid_data']      = {}
         d['last_tsbk']      = self.last_tsbk
@@ -2008,6 +2009,18 @@ class p25_system(object):
 
             # The easy part: send pure JSON and let the display layer handle formatting
             d['frequency_data'][f] = {'type': chan_type, 'tgids': tgids, 'last_activity': time_ago_str, 'counter': count, 'tags': tags, 'srcaddrs': srcaddrs, 'srctags': srctags}
+
+        # Talkgroups with observed encryption metadata
+        for tgid in sorted(self.talkgroups.keys()):
+            tg = self.talkgroups[tgid]
+            if (tg.get('encrypted', 0) == 0) and (tg.get('algid', -1) < 0) and (tg.get('keyid', -1) < 0):
+                continue
+            d['talkgroup_data'][tgid] = {'tgid'     : tgid,
+                                         'tag'      : tg.get('tag', ''),
+                                         'encrypted': tg.get('encrypted', 0),
+                                         'algid'    : tg.get('algid', -1),
+                                         'keyid'    : tg.get('keyid', -1),
+                                         'time'     : tg.get('time', 0)}
 
         # Patches
         self.expire_patches()
@@ -2741,4 +2754,3 @@ class p25_receiver(object):
             d['stream'] = self.meta_stream
             d['msgqid'] = self.msgq_id
             return json.dumps(d)
-

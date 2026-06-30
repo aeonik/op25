@@ -978,6 +978,9 @@ class p25_rx_block (gr.top_block):
             self.toggle_plot(plot_type)
         elif s == 'dump_tgids':
             self.trunk_rx.dump_tgids()
+            ui_rsp.append({'json_type': "ok", 'uuid': m_uuid})
+        elif s == 'dump_tracking':
+            ui_rsp.append({'json_type': "ok", 'uuid': m_uuid})
         elif s == 'add_default_config':
             nac = msg.arg1()
             self.trunk_rx.add_default_config(int(nac))
@@ -992,7 +995,9 @@ class p25_rx_block (gr.top_block):
 
         elif s in RX_COMMANDS:
             if not self.rx_q.full_p():
-                self.rx_q.insert_tail(msg)
+                cmd_msg = gr.message().make_from_string(s, -2, msg.arg1(), msg.arg2())
+                self.rx_q.insert_tail(cmd_msg)
+            ui_rsp.append({'json_type': "ok", 'uuid': m_uuid})
 
         if len(ui_rsp) > 0:
             msg = gr.message().make_from_string(json.dumps(ui_rsp), -4, 0, 0)

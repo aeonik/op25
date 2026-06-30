@@ -899,6 +899,8 @@ class rx_block (gr.top_block):
         elif s == 'dump_tgids':
             self.trunk_rx.dump_tgids()
             ui_rsp.append({'json_type': "ok", 'uuid': m_uuid})
+        elif s == 'dump_tracking':
+            ui_rsp.append({'json_type': "ok", 'uuid': m_uuid})
         elif s == 'capture':
             if not self.get_interactive():
                 sys.stderr.write("%s Cannot start capture for non-realtime (replay) sessions\n" % log_ts.get())

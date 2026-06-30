@@ -1,15 +1,13 @@
 ########################################################################
 # Project setup
 ########################################################################
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 3.10)
 project(gr-op25 CXX C)
 enable_testing()
 
 #policy setup
 cmake_policy(SET CMP0011 NEW)
 cmake_policy(SET CMP0012 NEW)
-cmake_policy(SET CMP0026 OLD)
-cmake_policy(SET CMP0045 OLD)
 
 set_property(GLOBAL PROPERTY ALLOW_DUPLICATE_CUSTOM_TARGETS 1)
 
