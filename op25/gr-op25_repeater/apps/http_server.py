@@ -23,6 +23,7 @@ import os
 import time
 import re
 import json
+import base64
 import socket
 import traceback
 import threading
@@ -41,6 +42,7 @@ my_port = None
 my_uuids = []
 q_mutex = threading.Lock()
 u_mutex = threading.Lock()
+plot_pat = re.compile(r'^plot-(?P<channel>\d+)-(?P<mode>[a-z]+)-(?P<sequence>\d+)\.png$')
 
 
 """
@@ -71,6 +73,81 @@ def static_file(environ, start_response):
         content_type = content_types[suf]
         status = '200 OK'
     return status, content_type, output
+
+def plot_stream(environ, start_response):
+    img_dir = '../www/images'
+    poll_interval = 0.10
+    heartbeat_interval = 15.0
+    candidates = {}
+    sent = {}
+    last_heartbeat = time.time()
+
+    def event_iter():
+        nonlocal last_heartbeat
+        while True:
+            emitted = False
+            try:
+                filenames = sorted(os.listdir(img_dir))
+            except OSError:
+                filenames = []
+
+            live = set()
+            for filename in filenames:
+                match = plot_pat.match(filename)
+                if match is None:
+                    continue
+
+                pathname = os.path.join(img_dir, filename)
+                try:
+                    st = os.stat(pathname)
+                except OSError:
+                    continue
+
+                sig = (st.st_mtime_ns, st.st_size)
+                live.add(filename)
+
+                if candidates.get(filename) != sig:
+                    candidates[filename] = sig
+                    continue
+                if sent.get(filename) == sig:
+                    continue
+
+                try:
+                    with open(pathname, 'rb') as f:
+                        png = f.read()
+                except OSError:
+                    continue
+
+                payload = {
+                    'file': filename,
+                    'channel': int(match.group('channel')),
+                    'mode': match.group('mode'),
+                    'sequence': int(match.group('sequence')),
+                    'data_uri': 'data:image/png;base64,%s' % base64.b64encode(png).decode('ascii')
+                }
+                sent[filename] = sig
+                emitted = True
+                last_heartbeat = time.time()
+                yield ('event: plot\ndata: %s\n\n' % json.dumps(payload, separators=(',', ':'))).encode('utf-8')
+
+            for cache in (candidates, sent):
+                for filename in list(cache.keys()):
+                    if filename not in live:
+                        cache.pop(filename, None)
+
+            now = time.time()
+            if not emitted and now - last_heartbeat >= heartbeat_interval:
+                last_heartbeat = now
+                yield b': keepalive\n\n'
+
+            time.sleep(poll_interval)
+
+    start_response('200 OK', [
+        ('Content-Type', 'text/event-stream'),
+        ('Cache-Control', 'no-cache'),
+        ('X-Accel-Buffering', 'no')
+    ])
+    return event_iter()
 
 def post_req(environ, start_response, postdata):
     global my_input_q, my_output_q, my_recv_q, my_port, q_mutex, u_mutex
@@ -155,7 +232,10 @@ def http_request(environ, start_response):
 def application(environ, start_response):
     failed = False
     try:
-        result = http_request(environ, start_response)
+        if environ['REQUEST_METHOD'] == 'GET' and environ['PATH_INFO'] == '/plot-stream':
+            result = plot_stream(environ, start_response)
+        else:
+            result = http_request(environ, start_response)
     except Exception:
         failed = True
         sys.stderr.write('application: request failed:\n%s\n' % traceback.format_exc())

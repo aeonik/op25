@@ -282,6 +282,29 @@ class rx_ctl(object):
         # Check for control channel reassignment
         self.check_cc_assignments()
 
+    def set_scan_group(self, scan_group_id, msgq_id):
+        if msgq_id in self.receivers:
+            sysname = self.receivers[msgq_id]['sysname']
+        elif len(self.systems) == 1:
+            sysname = next(iter(self.systems.keys()))
+        else:
+            return {'json_type': 'error', 'error': 'scan group target receiver not found'}
+
+        p25_sys = self.systems[sysname]['system']
+        scan_group = p25_sys.set_scan_group(scan_group_id)
+        if scan_group is None:
+            return {'json_type': 'error', 'error': 'scan group not found', 'scan_group': scan_group_id}
+
+        for rx in self.systems[sysname]['receivers']:
+            rx.reload_bl_wl(reason='scan group')
+
+        self.check_cc_assignments()
+        return {'json_type': 'scan_group',
+                'system': sysname,
+                'active_scan_group': p25_sys.active_scan_group,
+                'active_scan_group_label': p25_sys.active_scan_group_label,
+                'whitelist_count': 0 if p25_sys.whitelist is None else len(p25_sys.whitelist)}
+
     def to_json(self):
         d = {'json_type': 'trunk_update'}
         syid = 0;
@@ -384,6 +407,8 @@ class p25_system(object):
         self.patches_mutex = TimeoutLock(timeout=1.0)
         self.blacklist = {}
         self.whitelist = None
+        self.active_scan_group = from_dict(self.config, 'active_scan_group', '')
+        self.active_scan_group_label = ''
         self.crypt_behavior = 1
         self.crypt_keys = {}
         self.cc_rate = 4800
@@ -428,13 +453,7 @@ class p25_system(object):
             sys.stderr.write("%s [%s] reading system rid_tags_file: %s\n" % (log_ts.get(), self.sysname, self.config['rid_tags_file']))
             self.read_rids_file(self.config['rid_tags_file'])
 
-        if 'blacklist' in self.config and self.config['blacklist'] != "":
-            sys.stderr.write("%s [%s] reading system blacklist file: %s\n" % (log_ts.get(), self.sysname, self.config['blacklist']))
-            self.blacklist = get_int_dict(self.config['blacklist'], self.sysname)
-
-        if 'whitelist' in self.config and self.config['whitelist'] != "":
-            sys.stderr.write("%s [%s] reading system whitelist file: %s\n" % (log_ts.get(), self.sysname, self.config['whitelist']))
-            self.whitelist = get_int_dict(self.config['whitelist'], self.sysname)
+        self.load_bl_wl()
 
         if 'band_plan' in self.config:
             band_plan = self.config['band_plan']
@@ -506,6 +525,55 @@ class p25_system(object):
         if f is None:
             return "ID-0x%x" % (id)
         return "%f" % (f / 1000000.0)
+
+    def get_scan_group(self, scan_group_id):
+        scan_groups = from_dict(self.config, 'scan_groups', [])
+        if not isinstance(scan_groups, list):
+            return None
+
+        wanted = str(scan_group_id)
+        for group in scan_groups:
+            if not isinstance(group, dict):
+                continue
+            group_id = str(from_dict(group, 'id', ''))
+            group_label = str(from_dict(group, 'label', ''))
+            if wanted == group_id or wanted == group_label:
+                return group
+        return None
+
+    def load_bl_wl(self):
+        self.blacklist = {}
+        self.whitelist = None
+        self.active_scan_group_label = ''
+
+        scan_group = self.get_scan_group(self.active_scan_group)
+        if scan_group is not None:
+            whitelist_file = from_dict(scan_group, 'whitelist', '')
+            blacklist_file = from_dict(scan_group, 'blacklist', '')
+            self.active_scan_group = from_dict(scan_group, 'id', self.active_scan_group)
+            self.active_scan_group_label = from_dict(scan_group, 'label', '')
+            self.config['active_scan_group'] = self.active_scan_group
+            self.config['active_scan_group_label'] = self.active_scan_group_label
+            self.config['active_scan_group_whitelist'] = whitelist_file
+        else:
+            whitelist_file = from_dict(self.config, 'whitelist', '')
+            blacklist_file = from_dict(self.config, 'blacklist', '')
+
+        if blacklist_file != "":
+            sys.stderr.write("%s [%s] reading system blacklist file: %s\n" % (log_ts.get(), self.sysname, blacklist_file))
+            self.blacklist = get_int_dict(blacklist_file, self.sysname)
+
+        if whitelist_file != "":
+            sys.stderr.write("%s [%s] reading system whitelist file: %s\n" % (log_ts.get(), self.sysname, whitelist_file))
+            self.whitelist = get_int_dict(whitelist_file, self.sysname)
+
+    def set_scan_group(self, scan_group_id):
+        scan_group = self.get_scan_group(scan_group_id)
+        if scan_group is None:
+            return None
+        self.active_scan_group = from_dict(scan_group, 'id', scan_group_id)
+        self.load_bl_wl()
+        return scan_group
 
     def read_tags_file(self, tags_file):
         import csv
@@ -1928,6 +1996,9 @@ class p25_system(object):
         d['patch_data']     = {}
         d['wuid_data']      = {}
         d['last_tsbk']      = self.last_tsbk
+        d['active_scan_group'] = self.active_scan_group
+        d['active_scan_group_label'] = self.active_scan_group_label
+        d['whitelist_count'] = 0 if self.whitelist is None else len(self.whitelist)
 
         t = time.time()
 
@@ -2273,6 +2344,25 @@ class p25_receiver(object):
         else:
             self.whitelist = self.system.get_whitelist()
 
+    def tgid_allowed(self, tgid):
+        if tgid is None:
+            return True
+        if tgid in self.blacklist and (not self.whitelist or tgid not in self.whitelist):
+            return False
+        if self.whitelist and tgid not in self.whitelist:
+            return False
+        return True
+
+    def reload_bl_wl(self, reason='reload'):
+        self.blacklist = {}
+        self.whitelist = None
+        self.load_bl_wl()
+        if self.current_tgid is not None and not self.tgid_allowed(self.current_tgid):
+            self.expire_talkgroup(reason=reason, auto_hold=False)
+            self.hold_mode = False
+            self.hold_tgid = None
+            self.hold_until = time.time()
+
     def set_nac(self, nac):
         if self.current_nac != nac:
             self.current_nac = nac
@@ -2373,9 +2463,8 @@ class p25_receiver(object):
             elif data > 0:
                 self.add_blacklist(int(data))
         elif cmd == 'reload':
-            self.blacklist = {}
-            self.whitelist = None
-            self.load_bl_wl()
+            self.system.load_bl_wl()
+            self.reload_bl_wl()
 
     def process_qmsg(self, msg, curr_time):
         updated = 0

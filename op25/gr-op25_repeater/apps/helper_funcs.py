@@ -88,8 +88,13 @@ def get_int_dict(s, _id = 0):      # used to read blacklist/whitelist files
                 try:
                     v0 = int(v[0])                         # first parameter is tgid or start of tgid range
                     v1 = v0
-                    if (len(v) > 1) and (int(v[1]) > v0):  # second parameter if present is end of tgid range
-                        v1 = int(v[1])
+                    if len(v) > 1:
+                        try:
+                            v1_candidate = int(v[1])        # second numeric parameter is end of tgid range
+                            if v1_candidate > v0:
+                                v1 = v1_candidate
+                        except ValueError:
+                            pass                            # allow optional labels after a tab
 
                     for tg in range(v0, (v1 + 1)):
                             if tg not in d:      # is this a new tg?
@@ -224,5 +229,4 @@ class TimeoutLock():
 
     def locked(self, *args, **kwargs):
         return self.lock.locked(*args, **kwargs)
-
 

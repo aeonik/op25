@@ -58,6 +58,10 @@ var lastChannelData = null;
 var default_channel = null;
 var ws_endpoints = {};
 var ws_connections = {};
+var plot_stream = null;
+var plot_stream_connected = false;
+var plot_stream_frames = {};
+const PLOT_MODE_ORDER = ["fft", "constellation", "symbol", "eye", "mixer", "fll"];
 var audioCtx = null;
 var audioChannels = {};
 var muteAudioAtStartup = false;
@@ -67,6 +71,8 @@ var enc_sym = "&#216;";
 var site_alias = [];
 var newPresets = [];
 var noPresetsCounter = 0;
+var scanGroups = [];
+var activeScanGroup = null;
 localStorage.setItem('getConfigBtn', 0);
 
 var lg_step = 1200;  				// these are defaults, they are updated in term_config() if present.
@@ -261,6 +267,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 function do_onload() {
     send_command("get_terminal_config", 0, 0);
+    start_plot_stream();
     setInterval(do_update, 1000);
     send_command("get_full_config", 0, 0);
     send_command("get_ws_instances", 0, 0);
@@ -299,44 +306,121 @@ function term_config(d) {  // json_type: "terminal_config"
 
 }
 
+function current_plot_channel() {
+    if (channel_list.length > 0 && channel_index >= 0 && channel_index < channel_list.length) {
+        return String(channel_list[channel_index]);
+    }
+    return "0";
+}
+
+function plot_mode_rank(mode) {
+    const idx = PLOT_MODE_ORDER.indexOf(mode);
+    return idx >= 0 ? idx : PLOT_MODE_ORDER.length;
+}
+
+function update_plot_images_from_stream() {
+    const channel = current_plot_channel();
+    const frames = Object.values(plot_stream_frames)
+        .filter(frame => String(frame.channel) === channel)
+        .sort((a, b) => {
+            const ar = plot_mode_rank(a.mode);
+            const br = plot_mode_rank(b.mode);
+            if (ar !== br) return ar - br;
+            return Number(a.sequence || 0) - Number(b.sequence || 0);
+        });
+
+    const plotsCount = document.getElementById("plotsCount");
+    if (plotsCount) plotsCount.innerText = frames.length;
+
+    for (let i = 0; i < 6; i++) {
+        const img = document.getElementById("img" + i);
+        if (!img) continue;
+
+        if (i < frames.length) {
+            const frame = frames[i];
+            if (img.dataset.plotFile !== frame.file) {
+                img.src = frame.data_uri;
+                img.dataset.plotFile = frame.file;
+                img.dataset.plotMode = frame.mode;
+            }
+            img.style.display = "";
+        } else {
+            img.style.display = "none";
+            img.dataset.plotFile = "";
+            img.dataset.plotMode = "";
+        }
+    }
+
+    updatePlotButtonStyles();
+}
+
+function start_plot_stream() {
+    if (!window.EventSource || plot_stream !== null) return;
+
+    plot_stream = new EventSource("/plot-stream");
+    plot_stream.onopen = function() {
+        plot_stream_connected = true;
+    };
+    plot_stream.onerror = function() {
+        plot_stream_connected = false;
+    };
+    plot_stream.addEventListener("plot", function(event) {
+        try {
+            const frame = JSON.parse(event.data);
+            if (!frame || frame.file === undefined || frame.data_uri === undefined) return;
+            plot_stream_connected = true;
+            plot_stream_frames[String(frame.channel) + "|" + frame.mode] = frame;
+            update_plot_images_from_stream();
+        } catch (err) {
+            console.error("Plot stream parse error:", err.stack || err);
+        }
+    });
+}
+
 
 function rx_update(d) {
 
-	var plotsCount = d["files"].length;
-	document.getElementById('plotsCount').innerText = plotsCount;
+    const files = Array.isArray(d["files"]) ? d["files"] : [];
+    document.getElementById('plotsCount').innerText = files.length;
 
-    plotfiles = [];
-    
-    if ((d["files"] != undefined) && (d["files"].length > 0)) {
-        for (var i=0; i < d["files"].length; i++) {
-            if (channel_list.length > 0) {
-                expr = new RegExp("plot\-" + channel_list[channel_index] + "\-");
-            }
-            else {
-                expr = new RegExp("plot\-0\-");
-            }
+    if (plot_stream_connected) {
+        update_plot_images_from_stream();
+    } else {
+        plotfiles = [];
 
-            if (expr.test(d["files"][i])) {
-                plotfiles.push(d["files"][i]);
-            }
-        }
+        if (files.length > 0) {
+            for (var i=0; i < files.length; i++) {
+                if (channel_list.length > 0) {
+                    expr = new RegExp("plot\-" + channel_list[channel_index] + "\-");
+                }
+                else {
+                    expr = new RegExp("plot\-0\-");
+                }
 
-        for (var i=0; i < 6; i++) {
-            var img = document.getElementById("img" + i);
-            if (i < plotfiles.length) {
-                if (img['src'] != plotfiles[i]) {
-                    img['src'] = plotfiles[i];
-                    img.style["display"] = "";
+                if (expr.test(files[i])) {
+                    plotfiles.push(files[i]);
                 }
             }
-            else {
-                img.style["display"] = "none";
+
+            for (var i=0; i < 6; i++) {
+                var img = document.getElementById("img" + i);
+                if (i < plotfiles.length) {
+                    if (img['src'] != plotfiles[i]) {
+                        img['src'] = plotfiles[i];
+                        img.dataset.plotFile = plotfiles[i];
+                        img.dataset.plotMode = "";
+                        img.style["display"] = "";
+                    }
+                }
+                else {
+                    img.style["display"] = "none";
+                }
             }
         }
-    }
-    else {
-        var img = document.getElementById("img0");
-        img.style["display"] = "none";
+        else {
+            var img = document.getElementById("img0");
+            img.style["display"] = "none";
+        }
     }
     
     updatePlotButtonStyles();
@@ -1610,6 +1694,8 @@ function handle_response(dl) {
         terminal_config: term_config,
         plot: plot,
         full_config: full_config,
+        scan_group: scan_group,
+        error: op25_error,
         ws_instances: ws_instances
     };
 
@@ -1707,12 +1793,14 @@ function f_chan_button(command) {
     else if (channel_index >= channel_list.length) {
         channel_index = 0;
     }
+    if (plot_stream_connected) update_plot_images_from_stream();
 }
 
 function select_channel_by_id(ch_id) {
     var idx = channel_list.indexOf(String(ch_id));
     if (idx >= 0) {
         channel_index = idx;
+        if (plot_stream_connected) update_plot_images_from_stream();
     }
 }
 
@@ -1819,6 +1907,80 @@ function f_preset(i) {
 
         send_command(command, _tgid, Number(channel_list[channel_index]));
     }
+}
+
+function loadScanGroupsFromConfig(config) {
+    const row = document.getElementById("scanGroupRow");
+    const select = document.getElementById("scanGroupSelect");
+    const status = document.getElementById("scanGroupStatus");
+    if (!row || !select || !status) return;
+
+    const chans = config?.trunking?.chans || [];
+    let chan = null;
+    if (c_system != null) {
+        chan = chans.find(c => c.sysname === c_system);
+    }
+    if (!chan && chans.length > 0) {
+        chan = chans[0];
+    }
+
+    scanGroups = chan?.scan_groups || [];
+    activeScanGroup = chan?.active_scan_group ?? null;
+    if (!scanGroups.length) {
+        row.style.display = "none";
+        return;
+    }
+
+    select.innerHTML = "";
+    scanGroups.forEach(group => {
+        const opt = document.createElement("option");
+        opt.value = String(group.id ?? group.label ?? "");
+        opt.textContent = group.label || `Group ${opt.value}`;
+        opt.title = group.whitelist || "No whitelist";
+        select.appendChild(opt);
+    });
+
+    if (activeScanGroup !== null) {
+        select.value = String(activeScanGroup);
+    }
+
+    const current = scanGroups.find(group => String(group.id) === String(activeScanGroup));
+    status.textContent = current ? `Active: ${current.label}` : "Active: -";
+    row.style.display = "";
+}
+
+function apply_scan_group() {
+    const select = document.getElementById("scanGroupSelect");
+    const status = document.getElementById("scanGroupStatus");
+    if (!select || select.value === "") return;
+
+    activeScanGroup = select.value;
+    if (status) status.textContent = "Applying...";
+
+    const msgq = channel_list.length == 0 ? 0 : Number(channel_list[channel_index]);
+    send_command("set_scan_group", activeScanGroup, msgq);
+}
+
+function scan_group(d) {
+    activeScanGroup = d.active_scan_group;
+    const select = document.getElementById("scanGroupSelect");
+    const status = document.getElementById("scanGroupStatus");
+    if (select && activeScanGroup !== undefined) {
+        select.value = String(activeScanGroup);
+    }
+    if (status) {
+        const label = d.active_scan_group_label || activeScanGroup || "-";
+        const count = d.whitelist_count || 0;
+        status.textContent = count > 0 ? `Active: ${label} (${count} TGs)` : `Active: ${label}`;
+    }
+}
+
+function op25_error(d) {
+    const status = document.getElementById("scanGroupStatus");
+    if (status && d.error) {
+        status.textContent = d.error;
+    }
+    console.error("OP25 error:", d);
 }
 
 function f_scan_button(command) {
@@ -2303,7 +2465,7 @@ function updatePlotButtonStyles() {
     const img = document.getElementById(`img${i}`);
     if (!img || img.style.display === "none") continue;
 
-    const src = img.getAttribute("src") || "";
+    const src = img.dataset.plotMode || img.getAttribute("src") || "";
     buttonIds.forEach(type => {
       if (src.includes(type)) {
         const btn = document.getElementById(`pb-${type}`);
@@ -2612,6 +2774,7 @@ function full_config(config) {
 
 	var sa = config['trunking'] ? config['trunking']['chans'] : [];
 	site_alias = buildSiteAliases(sa);
+	loadScanGroupsFromConfig(config);
 
     // some payloads are sending over full_config when it's not requested (plots) and not needed.
     var getConfigBtn = localStorage.getItem('getConfigBtn');
@@ -3519,4 +3682,3 @@ document.addEventListener("keydown", function (e) {
   var container = document.getElementById("searchSubsPopup");
   if (container && container.classList.contains("show")) closeSubSearchModal();
 });
-

@@ -311,6 +311,14 @@
               <button id="preset-btn-6" class="" onclick="this.blur(); f_preset(6)">Preset 6</button>
             </td>
           </tr>
+          <tr id="scanGroupRow" style="display: none;">
+            <td colspan="3" class="bottom-buttons">
+              <span class="small-label">Scan Group</span>
+              <select id="scanGroupSelect" title="Select scan group"></select>
+              <button class="small-button" id="scanGroupApply" onclick="this.blur(); apply_scan_group();">Apply</button>
+              <span class="small-value" id="scanGroupStatus">-</span>
+            </td>
+          </tr>
         </table>
         <table class="outer-table" id="channels-container" style="text-align:left;">
           <tr>

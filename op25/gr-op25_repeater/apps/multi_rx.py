@@ -837,6 +837,7 @@ class rx_block (gr.top_block):
         if type(s) is not str and isinstance(s, bytes):
             # should only get here if python3
             s = s.decode()
+        d = {}
         try:    # See if we can treat the incoming message as JSON format (from HTTP UI)
             d = json.loads(s)
             s = d['command'] if "command" in d and d['command'] is not None else ""
@@ -896,6 +897,15 @@ class rx_block (gr.top_block):
             for chan in self.channels:
                 js[chan.msgq_id] = chan.ws_instance
             ui_rsp.append(js)
+        elif s == 'set_scan_group':
+            scan_group = d.get('arg1', msg.arg1())
+            msgq_id = int(d.get('arg2', msg.arg2()) or 0)
+            if self.trunking is not None and self.trunk_rx is not None:
+                js = self.trunk_rx.set_scan_group(scan_group, msgq_id)
+                js['uuid'] = m_uuid
+                ui_rsp.append(js)
+            else:
+                ui_rsp.append({'json_type': 'error', 'error': 'trunking not enabled', 'uuid': m_uuid})
         elif s == 'dump_tgids':
             self.trunk_rx.dump_tgids()
             ui_rsp.append({'json_type': "ok", 'uuid': m_uuid})
