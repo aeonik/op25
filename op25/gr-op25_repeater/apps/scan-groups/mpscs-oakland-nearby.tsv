@@ -1,0 +1,106 @@
+# Northeast Oakland / Lake Orion area scan group.
+# Format is one decimal TGID per line; text after a tab is ignored by OP25.
+
+# Countywide/common and patches
+2163	63COM Countywide Common
+2183	63PINT Patch to Oakland County TAC-1
+2823	63E911 EMS Patch to Oakland County
+2831	63F911 Fire Patch to Oakland County
+32154	63ALLDISP Countywide All Dispatch
+32183	63PSFIRE1 Countywide Public Safety Fire Tac 1
+32707	63FIRE-MSP Fire-To-MSP
+
+# Hospitals / medical around Rochester
+2383	63CRIT Crittenton Ascension Hospital Rochester
+2990	63CRITT Crittendon Hospital
+
+# Fire: Addison, Auburn Hills, Brandon, Groveland, Holly, Independence
+32147	63ATFD1 Addison Twp Fire 1
+32148	63ATFD2 Addison Twp Fire 2
+32149	63ATFD3 Addison Twp Fire 3
+32150	63AHFD1 Auburn Hills Fire 1
+32151	63AHFD2 Auburn Hills Fire 2
+32152	63AHFD3 Auburn Hills Fire 3
+32160	63BTFD1 Brandon Twp Fire Dispatch
+32161	63BTFD2 Brandon Twp Fire 2
+32162	63BTFD3 Brandon Twp Fire 3
+32184	63GTFD1 Groveland Twp Fire Dispatch
+32185	63GTFD2 Groveland Twp Fire 2
+32186	63GTFD3 Groveland Twp Fire 3
+32198	63HOFD1 Holly Fire 1
+32199	63HOFD2 Holly Fire 2
+32201	63ITFD1 Independence Twp Fire 1
+32202	63ITFD2 Independence Twp Fire 2
+
+# Fire: Oakland Twp, Orion/Lake Orion, Oxford, Rochester, Rochester Hills
+32246	63OTFD1 Oakland Twp Fire 1
+32247	63OTFD2 Oakland Twp Fire 2
+32248	63OTFD3 Oakland Twp Fire 3
+32250	63ORTFD1 Orion Twp Fire 1
+32251	63ORTFD2 Orion Twp Fire 2
+32254	63OXFD1 Oxford Fire 1
+32255	63OXFD2 Oxford Fire 2
+32256	63OXFD3 Oxford Fire 3
+32258	63RCFD1 Rochester Fire Dispatch
+32259	63RCFD2 Rochester Fire 2
+32262	63RHFD1 Rochester Hills Fire 1
+32263	63RHFD2 Rochester Hills Fire 2
+32264	63RHFD3 Rochester Hills Fire 3
+32265	63RHFD4 Rochester Hills Fire 4
+
+# Law / sheriff dispatch and tac groups. Many are encrypted, but keep them in
+# the group so encrypted call metadata still has context when it appears.
+32325	63AHPOL1 Auburn Hills Police Dispatch
+32326	63AHPOL2 Auburn Hills Police Secondary
+32415	63LAWTAC1 Countywide Law Tac 1
+32416	63LAWTAC2 Countywide Law Tac 2
+32417	63LAWTAC3 Countywide Law Tac 3
+32418	63LAWTAC4 Countywide Law Tac 4
+32419	63LAWTAC5 Countywide Law Tac 5
+32420	63LAWTAC6 Countywide Law Tac 6
+32429	63OCSLEIN LEIN/Teletype
+32430	63OCSOPS1 Sheriff Ops 1
+32431	63OCSOPS2 Sheriff Ops 2
+32432	63OCSWEST Sheriff West Dispatch
+32437	63OCSOPS4 Sheriff Ops 4
+32440	63OSP Pontiac Dispatch
+32443	63OSR Rochester Hills Dispatch
+32467	63OCSOPS5 Sheriff Ops 5
+32473	63RCPOL1 Rochester City Police Dispatch
+32598	63OCSOPS6 Sheriff Ops 6
+32680	63OCSOPS7 Sheriff Ops 7
+32714	63OCSOPS8 Sheriff Ops 8
+32716	63OSSSRT Oakland Sheriff Search and Rescue
+32718	63OCSOPS9 Sheriff Ops 9
+
+# Countywide events
+32563	63EVENT1 Countywide Common Special Events 1
+32564	63EVENT2 Countywide Common Special Events 2
+32565	63EVENT3 Countywide Common Special Events 3
+32566	63EVENT4 Countywide Common Special Events 4
+32567	63EVENT5 Countywide Common Special Events 5
+32568	63EVENT6 Countywide Common Special Events 6
+32569	63EVENT7 Countywide Common Special Events 7
+32570	63EVENT8 Countywide Common Special Events 8
+32571	63EVENT9 Countywide Common Special Events 9
+32572	63EVENT10 Countywide Common Special Events 10
+32573	63EVENT11 Countywide Common Special Events 11
+32574	63EVENT12 Countywide Common Special Events 12
+32575	63EVENT13 Countywide Common Special Events 13
+32576	63EVENT14 Countywide Common Special Events 14
+32577	63EVENT15 Countywide Common Special Events 15
+32578	63EVENT16 Countywide Common Special Events 16
+
+# Fire paging
+32888	63PGATFD Addison Twp Fire Paging
+32889	63PGORTFD Orion Twp Fire Paging
+32891	63PGPGOTFD Oakland Twp Fire Paging
+32900	63PGATFD Addison Twp Fire Paging
+32901	63PGOXFD Oxford Fire Paging
+32902	63AHFD Auburn Hills Fire Page
+32903	63PGRHFD Rochester Hills Fire Paging
+32904	63PGBTFD Brandon Twp Fire Paging
+32905	63PGGTFD Groveland Twp Fire Paging
+32906	63PFGTFD Groveland Twp Fire Paging
+32907	63PGHOFD Holly Fire Paging
+32908	63PGITFD Independence Twp Fire Page
